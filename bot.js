@@ -190,7 +190,21 @@ client.on('messageCreate', async message => {
             const randomFarewell = farewells[Math.floor(Math.random() * farewells.length)];
             await message.reply(randomFarewell);
             
-        } else if (content.includes('emoji')) {
+        }else if (content.includes('goodmorning') || content.includes('Good Morning') || content.includes('Good morning') || content.includes('Goodmorning') || content.includes('morning')) {
+            console.log('Responding to goodnight');
+            const farewells = [
+                '🌞 Good Morning! Wishing you a day full of smiles and success! 💫',
+                '☀️ Rise and shine! May your day be as bright as your smile 😊',
+                '🌻 Good morning, sunshine! Let’s make today amazing 💛',
+                '🌅 A fresh morning, a fresh start. Have a beautiful day! 🍃',
+                '🌼 Good morning! Sending positive vibes and warm hugs your way 🤗'
+            ];
+            const randomFarewell = farewells[Math.floor(Math.random() * farewells.length)];
+            await message.reply(randomFarewell);
+            
+        }
+        
+        else if (content.includes('emoji')) {
             console.log('Responding to emoji');
             const emojimsg = '❤️❤️🫂❤️❤️\n😘😘❤️🥰🥰\n🥰🥰❤️😘😘\n❤️❤️🫂❤️❤️';
             await message.reply(emojimsg);
