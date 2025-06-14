@@ -1,8 +1,50 @@
 const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes } = require('discord.js');
 
+const express = require('express');
 // Bot configuration
 const TOKEN = 'MTM4MzQ1OTQxMzQyNzIyODcyMg.GVhU6G.vMTMVD7nDwUIJxM_PDrDl32rAequTZZf1Ss3Gg';
 const CLIENT_ID = '1383459413427228722';
+
+
+const PORT = process.env.PORT || 3000;
+
+// Create Express app for health checks
+const app = express();
+
+// Health check endpoints
+app.get('/', (req, res) => {
+    res.status(200).json({
+        status: 'online',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        bot_status: client.user ? 'connected' : 'disconnected',
+        bot_username: client.user ? client.user.tag : 'N/A'
+    });
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'healthy',
+        service: 'discord-bot',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/ping', (req, res) => {
+    res.status(200).send('pong');
+});
+
+// Start the HTTP server
+app.listen(PORT, () => {
+    console.log(`🌐 HTTP server is running on port ${PORT}`);
+});
+
+// Keep-alive function
+function keepAlive() {
+    setInterval(() => {
+        console.log(`🔄 Keep-alive ping at ${new Date().toISOString()}`);
+    }, 14 * 60 * 1000); // Every 14 minutes
+}
 
 // Create a new client instance
 const client = new Client({
@@ -203,6 +245,12 @@ client.on('messageCreate', async message => {
             await message.reply(randomFarewell);
             
         }
+        //  else if (content.includes('test')) {
+        //     console.log('Responding to testing');
+        //     const testmsg = 'this is just a testing message';
+        //     await message.reply(testmsg);
+            
+        // }
         
         else if (content.includes('emoji')) {
             console.log('Responding to emoji');
@@ -215,7 +263,24 @@ client.on('messageCreate', async message => {
             await message.reply('👋 Hey! You mentioned me! Try saying:\n• `@' + client.user.username + ' hello`\n• `@' + client.user.username + ' chika`\n• `@' + client.user.username + ' goodbye`\n• `@' + client.user.username + ' goodnight`\n• `@' + client.user.username + ' emoji`');
         }
     }
+
+
+    keepAlive(); // Start keep-alive mechanism
 });
 
 // Login to Discord with your client's token
 client.login(TOKEN);
+
+// Error handling
+client.on('error', (error) => {
+    console.error('Discord client error:', error);
+});
+
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error);
+    process.exit(1);
+});
