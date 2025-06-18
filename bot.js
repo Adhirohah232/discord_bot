@@ -13,6 +13,71 @@ const PORT = process.env.PORT || 3000;
 
 // Create Express app for health checks
 const app = express();
+// Add this at the top with other requires
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Add this after your existing configuration constants
+const GEMINI_API_KEY = 'AIzaSyBoYtHlEf2W4g4BBeWUoCOlwAoOs8yIT_w';
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+
+// Add this helper function after your existing helper functions
+async function getHealthAdvice(question) {
+    try {
+        console.log('=== Health Advice Debug ===');
+        console.log('Question:', question);
+        console.log('API Key (first 10 chars):', GEMINI_API_KEY.substring(0, 10) + '...');
+        
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+        
+        const prompt = `You are a helpful health, fitness, and nutrition assistant bot for a Discord server. Your role is to provide accurate, helpful advice specifically related to:
+- Health and wellness
+- Fitness and exercise
+- Nutrition and diet
+- Weight management
+- Mental health and wellbeing related to physical health
+
+IMPORTANT GUIDELINES:
+1. ONLY answer questions related to health, fitness, and nutrition
+2. If the question is not related to these topics, politely decline and redirect
+3. Always remind users to consult healthcare professionals for serious medical concerns
+4. Keep responses concise (under 1500 characters for Discord)
+5. Be encouraging and supportive
+6. Provide practical, actionable advice
+7. Do not diagnose medical conditions
+
+User Question: "${question}"
+
+If this question is NOT related to health, fitness, or nutrition, respond with: "I'm sorry, but I can only help with health, fitness, and nutrition related questions. Please ask me something about wellness, exercise, diet, or similar topics!"
+
+Otherwise, provide a helpful, accurate response within the guidelines above.`;
+
+        console.log('Sending request to Gemini...');
+        const result = await model.generateContent(prompt);
+        console.log('Received response from Gemini');
+        
+        const response = await result.response;
+        const text = response.text();
+        
+        console.log('Response text length:', text.length);
+        
+        // Ensure response isn't too long for Discord
+        if (text.length > 1900) {
+            return text.substring(0, 1900) + "...\n\n💡 *Response truncated. For detailed advice, consult a healthcare professional.*";
+        }
+        
+        return text;
+    } catch (error) {
+        console.error('=== DETAILED ERROR LOG ===');
+        console.error('Error type:', error.constructor.name);
+        console.error('Error message:', error.message);
+        console.error('Error code:', error.code);
+        console.error('Error status:', error.status);
+        console.error('Full error object:', JSON.stringify(error, null, 2));
+        console.error('Stack trace:', error.stack);
+        
+        return "❌ Sorry, I'm having trouble processing your request right now. Please try again later or consult a healthcare professional for important health concerns.";
+    }
+}
 
 // Health check endpoints
 app.get('/', (req, res) => {
@@ -350,7 +415,7 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'hello') {
             const greetings = [
-                '👋 Hello there! This bot is being created with the intention of helping reduce Chika\'s body-fat. It is currently under maintenance. Meanwhile, u can check the other features of this App- try metioning @Adi_bot'
+                '👋 Hello there! This bot is being created with the intention of helping reduce Chika\'s body-fat.\n * latest update: fitness bot is added, try mentioning it @Adi_bot help*'
             ];
             
             const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
@@ -375,7 +440,9 @@ client.on('interactionCreate', async interaction => {
                 ephemeral: false
             });
             
-        } else if (interaction.commandName === 'goodbye') {
+        }
+        
+        else if (interaction.commandName === 'goodbye') {
             const farewells = [
                 '👋 Goodbye! See you later!',
                 '🌙 Farewell! Have a wonderful rest of your day!',
@@ -457,7 +524,29 @@ client.on('interactionCreate', async interaction => {
     });
 }
 
-    } else if (interaction.isStringSelectMenu()) {
+    } 
+    else if (interaction.isButton()) {
+    if (interaction.customId === 'show_health_modal') {
+        const modal = new ModalBuilder()
+            .setCustomId('health_question_modal')
+            .setTitle('🏥 Health & Fitness Assistant');
+
+        const questionInput = new TextInputBuilder()
+            .setCustomId('health_question_input')
+            .setLabel('Your Health/Fitness/Nutrition Question')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Ask me anything about health, fitness, nutrition, exercise, diet, wellness...')
+            .setRequired(true)
+            .setMaxLength(1000);
+
+        const questionRow = new ActionRowBuilder().addComponents(questionInput);
+        modal.addComponents(questionRow);
+
+        await interaction.showModal(modal);
+    }
+}
+    
+    else if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'date_select') {
             const selectedDate = interaction.values[0];
             
@@ -501,7 +590,7 @@ client.on('interactionCreate', async interaction => {
                 });
             }
         }
-    } else if (interaction.isModalSubmit()) {
+ } else if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('steps_modal_')) {
             await interaction.deferReply({ flags: 64 }); // ephemeral flag
             
@@ -542,6 +631,25 @@ client.on('interactionCreate', async interaction => {
                     flags: 64 // ephemeral flag
                 });
             }
+        } else if (interaction.customId === 'health_question_modal') {
+            await interaction.deferReply({ flags: 64 }); // ephemeral flag
+            
+            const question = interaction.fields.getTextInputValue('health_question_input');
+            
+            try {
+                const advice = await getHealthAdvice(question);
+                
+                await interaction.editReply({
+                    content: `🏥 **Health Assistant Response:**\n\n${advice}\n\n⚕️ *Always consult healthcare professionals for serious medical concerns.*`,
+                    flags: 64 // ephemeral flag
+                });
+            } catch (error) {
+                console.error('Error in health question modal:', error);
+                await interaction.editReply({
+                    content: '❌ An error occurred while processing your health question. Please try again later.',
+                    flags: 64 // ephemeral flag
+                });
+            }
         }
     }
     
@@ -574,7 +682,7 @@ client.on('messageCreate', async message => {
         if (content.includes('hello') || content.includes('hi') || content.includes('hey')) {
             console.log('Responding to hello');
             const greetings = [
-                '👋 Hello there! This bot is being created with the intention of helping reduce Chika\'s body-fat. It is currently under maintenance. Meanwhile, u can check the other features of this App- try metioning @Adi_bot'
+                '👋 Hello there! This bot is being created with the intention of helping reduce Chika\'s body-fat.\n ** latest update: fitness bot is added, try mentioning it using: @Adi_bot help **'
             ];
             const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
             await message.reply(randomGreeting);
@@ -618,7 +726,7 @@ client.on('messageCreate', async message => {
             const randomFarewell = farewells[Math.floor(Math.random() * farewells.length)];
             await message.reply(randomFarewell);
             
-        } else if (content.includes('goodmorning') || content.includes('Good Morning') || content.includes('Good morning') || content.includes('Goodmorning') || content.includes('morning')) {
+        } else if (content.includes('goodmorning') || content.includes('Good Morning')|| content.includes('mrning') || content.includes('gd morning') || content.includes('Goodmorning') || content.includes('morning')) {
             console.log('Responding to goodmorning');
             const farewells = [
                 '🌞 Good Morning! Wishing you a day full of smiles and success! 💫',
@@ -630,15 +738,50 @@ client.on('messageCreate', async message => {
             const randomFarewell = farewells[Math.floor(Math.random() * farewells.length)];
             await message.reply(randomFarewell);
             
-        } else if (content.includes('emoji')) {
+        }
+         else if (content.includes('emoji')) {
             console.log('Responding to emoji');
             const emojimsg = '❤️❤️🫂❤️❤️\n😘😘❤️🥰🥰\n🥰🥰❤️😘😘\n❤️❤️🫂❤️❤️';
             await message.reply(emojimsg);
             
-        } else {
+        } 
+        else if (content.includes('help') || content.includes('health') || content.includes('fitness') || content.includes('nutrition')) {
+    console.log('Responding to health help request');
+    
+    // Create modal for health question
+    const modal = new ModalBuilder()
+        .setCustomId('health_question_modal')
+        .setTitle('🏥 Health & Fitness Assistant');
+
+    // Create question input
+    const questionInput = new TextInputBuilder()
+        .setCustomId('health_question_input')
+        .setLabel('Your Health/Fitness/Nutrition Question')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Ask me anything about health, fitness, nutrition, exercise, diet, wellness...')
+        .setRequired(true)
+        .setMaxLength(1000);
+
+    const questionRow = new ActionRowBuilder().addComponents(questionInput);
+    modal.addComponents(questionRow);
+
+    // Since we can't show modal from message, we'll create a button interaction
+    const helpButton = new ButtonBuilder()
+        .setCustomId('show_health_modal')
+        .setLabel('🏥 Ask Health Question')
+        .setStyle(ButtonStyle.Primary);
+
+    const buttonRow = new ActionRowBuilder().addComponents(helpButton);
+
+    await message.reply({
+        content: '🏥 **Health & Fitness Assistant**\n\nI can help you with questions about:\n• 💪 Fitness and Exercise\n• 🥗 Nutrition and Diet\n• 🏃‍♀️ Weight Management\n• 🧘‍♀️ Wellness and Mental Health\n• 📊 Health Tips and Advice\n\nClick the button below to ask your question:',
+        components: [buttonRow]
+    });
+}
+        else {
             console.log('Responding with default message');
             // Default response when mentioned but no specific command
-await message.reply('👋 Hey! You mentioned me! Try saying:\n• `@' + client.user.username + ' hello`\n• `@' + client.user.username + ' chika`\n• `@' + client.user.username + ' goodbye`\n• `@' + client.user.username + ' goodnight`\n• `@' + client.user.username + ' emoji`\n• Use `/updatecounts` to update step data\n• Use `/summarize` to get monthly summary');        }
+await message.reply('👋 Hey! You mentioned me! Try saying:\n• `@' + client.user.username + ' hello`\n• `@' + client.user.username + ' chika`\n• `@' + client.user.username + ' goodbye`\n• `@' + client.user.username + ' goodnight`\n• `@' + client.user.username + ' emoji`\n• `@' + client.user.username + ' help`\n• Use `/updatecounts` to update step data\n• Use `/summarize` to get monthly summary');        }
     }
 
     keepAlive(); // Start keep-alive mechanism
