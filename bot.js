@@ -745,6 +745,16 @@ client.on('messageCreate', async message => {
             await message.reply(emojimsg);
             
         } 
+             else if (content.includes('giphy')) {
+            console.log('Responding to a giphy');
+            const giphymsg= 'https://tenor.com/view/bisous-gif-895836831711452882'
+            await message.reply(giphymsg);
+            
+        } 
+
+
+             
+             
         else if (content.includes('help') || content.includes('health') || content.includes('fitness') || content.includes('nutrition')) {
     console.log('Responding to health help request');
     
